@@ -180,6 +180,47 @@ onAuthStateChanged(auth, async (user)=>{
   subscribeInventory();
 });
 
+$('#sell-all').onclick = async ()=>{
+  if(!state.user){ show('#auth-modal', true); return; }
+
+  const invCol = collection(db,'users',state.user.uid,'inventory');
+  const qs = await getDocs(invCol);
+  if(qs.empty){ alert('Inventory is empty'); return; }
+
+  let total = 0;
+  const ids = [];
+  qs.forEach(d=>{
+    const it = d.data().item || d.data();
+    total += Number(it.value||0);
+    ids.push(d.id);
+  });
+
+  try{
+    // crédite toute la somme
+    await runTransaction(db, async (tx)=>{
+      const uref = doc(db,'users',state.user.uid);
+      const usnap= await tx.get(uref);
+      const u = usnap.data() || { balance:0 };
+      tx.update(uref, { balance: (u.balance||0) + total });
+    });
+
+    // supprime tous les items
+    await Promise.all(ids.map(id => deleteDoc(doc(db,'users',state.user.uid,'inventory', id))));
+
+    // refresh header + petit effet
+    const snap = await getDoc(doc(db,'users',state.user.uid));
+    state.userDoc = snap.data();
+    $('#balance').textContent = fmt(state.userDoc.balance||0);
+    bumpBalance(total);
+  }catch(err){
+    console.error(err);
+    alert('Sell all failed');
+  }
+};
+
+
+
+
 // ===================
 // Cases (list + detail)
 // ===================
@@ -194,7 +235,7 @@ function renderCases(){
   const grid = $('#cases-grid'); grid.innerHTML = '';
   state.cases.forEach(c=>{
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card case-card';
     card.innerHTML = `
       <img src="${c.image||'https://picsum.photos/600/300?blur=2'}" alt=""
            style="width:100%;height:140px;object-fit:cover;border-radius:12px"/>
@@ -204,10 +245,19 @@ function renderCases(){
         <span class="price">${fmt(c.price)}</span>
       </div>
       <button class="view-case">View</button>`;
-    card.querySelector('.view-case').onclick = ()=> showCaseDetail(c);
+
+    // bouton “View”
+    card.querySelector('.view-case').onclick = (e)=> { e.stopPropagation(); showCaseDetail(c); };
+    // toute la carte
+    card.addEventListener('click', (e)=>{
+      if (e.target.closest('button')) return; // ignore click sur le bouton
+      showCaseDetail(c);
+    });
+
     grid.appendChild(card);
   });
 }
+
 loadCases();
 
 function showCaseDetail(c){
@@ -215,6 +265,13 @@ function showCaseDetail(c){
   $('#cd-name').textContent  = c.name;
   $('#cd-price').textContent = `Price: ${fmt(c.price)}`;
   $('#cd-image').src         = c.image || 'https://picsum.photos/800/400?blur=1';
+
+  // bouton “Open for $X.XX”
+  const openBtn = $('#cd-open');
+  openBtn.textContent = `Open for ${fmt(c.price)}`;
+  openBtn.onclick = ()=> openSelectedCase();
+
+  $('#back-to-cases').onclick = ()=> showView('cases');
 
   const list = $('#cd-items'); list.innerHTML = '';
   (c.items||[]).forEach(it=>{
