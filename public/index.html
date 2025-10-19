@@ -58,26 +58,27 @@
       </div>
     </div>
   </div>
-
   <!-- Deposit modal -->
-  <div id="deposit-modal" class="modal hidden">
-    <div class="modal-card">
-      <h3>Deposit</h3>
-      <label>Amount (USD)</label>
-      <input id="dep-amount" type="number" min="1" step="1" value="10" />
-      <div class="row">
-        <button id="dep-create">Create invoice (proxy)</button>
-        <button id="redeem-toggle">Redeem code</button>
-      </div>
-      <div id="redeem-wrap" class="hidden">
-        <input id="redeem-code" placeholder="Enter code (TEST10/25/50)" />
-        <button id="redeem-do">Redeem</button>
-      </div>
-      <div id="dep-status"></div>
-      <button class="link" id="close-dep"
-  onclick="document.querySelector('#deposit-modal').classList.add('hidden')">close</button>
+<div id="deposit-modal" class="modal hidden">
+  <div class="modal-card">
+    <h3>Deposit</h3>
+    <label>Amount (USD)</label>
+    <input id="dep-amount" type="number" min="1" step="1" value="10" />
+    <div class="row">
+      <button id="dep-create">Create invoice (proxy)</button>
+      <button id="redeem-toggle">Redeem code</button>
     </div>
+    <div id="redeem-wrap" class="hidden">
+      <input id="redeem-code" placeholder="Enter code (TEST10/25/50)" />
+      <button id="redeem-do">Redeem</button>
+    </div>
+    <div id="dep-status"></div>
+    <!-- FAIL-SAFE: ferme même si JS est cassé -->
+    <button class="link" id="close-dep"
+      onclick="document.querySelector('#deposit-modal').classList.add('hidden')">close</button>
   </div>
+</div>
+
 
   <script type="module" src="app.js"></script>
 </body>
