@@ -241,10 +241,10 @@ function renderCases(){
            style="width:100%;height:140px;object-fit:cover;border-radius:12px"/>
       <h4>${c.name}</h4>
       <div class="row">
-        <span class="badge">${c.items?.length||0} items</span>
-        <span class="price">${fmt(c.price)}</span>
+        
+        
       </div>
-      <button class="view-case">View</button>`;
+      <button class="view-case"><span class="price">${fmt(c.price)}</span></button>`;
 
     // bouton “View”
     card.querySelector('.view-case').onclick = (e)=> { e.stopPropagation(); showCaseDetail(c); };

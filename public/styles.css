@@ -12,12 +12,10 @@
 html, body{
   min-height:100%;
   background:#0b0f14;               /* fond uni de sûreté */
-  background-image: linear-gradient(180deg,#0b0f14,#0e1520);
+  
   color:#e6edf3;
 }
-section, main, .container, #case-detail, #cd-items{
-  background: transparent !important;
-}
+
 
 body{
   margin:0;
@@ -149,8 +147,8 @@ input, select{
 #cd-open{ display:block; margin:6px auto 14px auto } /* bouton sous l’image, centré */
 #cd-items{
   display:grid;
-  grid-template-columns: repeat(7, 140px);   /* 7 items par ligne */
-  gap: 0;                                     /* pas d'espace entre cartes */
+  grid-template-columns: repeat(5, 140px);   /* 7 items par ligne */
+  gap: 28px;                                     /* pas d'espace entre cartes */
   justify-content:center;                     /* centré */
   align-items:start;
   margin: 10px auto 40px;                     /* un peu d'air en bas */
@@ -160,6 +158,7 @@ input, select{
 #cd-items .card{
   width:140px;
   padding:8px;
+  height: 240px;
   border-radius:10px;
   background:var(--card);
   border:1px solid #1e2a39;
@@ -224,16 +223,20 @@ input, select{
 }
 
 /* centre le grid des drops */
-#cd-items{
-  display:grid;
-  grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-  gap:16px;
-  justify-content:center;       /* centre la grille */
-}
+
 #case-detail h3 { text-align:center; }
 
 /* bouton open case bien visible */
-#cd-open { padding:10px 16px; font-weight:700; }
+#cd-open { padding:10px 16px; font-weight:700;
+    margin-top:6px;
+  padding:8px 14px;
+  border-radius:999px;
+  font-weight:700;
+  border:1px solid transparent;
+  background: var(--orange);
+  color:#0b0f14;                /* lisible sur orange */
+  box-shadow: 0 6px 18px rgba(255,159,26,.25);
+}
 
 /* écarte les sections de la home */
 .container > section { margin-top: 8px; }
@@ -247,3 +250,60 @@ input, select{
 }
 .nav a{ margin:0 10px; padding:6px 10px; border-radius:8px; }
 .nav a:hover{ background:#111a24; }
+#sell-all {
+  margin-top: 15px;
+  background:#ff4d4d;
+  border:1px solid #b32424;
+}
+
+
+:root{
+  --orange:#fc6704;            /* tu peux essayer #ffa62b ou #ff7a18 si tu veux plus “flashy” */
+}
+
+/* Cartes de la liste des cases (home only) */
+#cases-grid .card{
+  display:flex;
+  flex-direction:column;
+  align-items:center;           /* centre l’image, le titre et le bouton */
+  text-align:center;
+  padding:14px;
+}
+
+#cases-grid .card img{
+  width:100%;
+  height:160px;                 /* hauteur uniforme */
+  object-fit:cover;
+  border-radius:12px;
+  margin-bottom:10px;
+}
+
+#cases-grid .card h4{
+  margin:6px 0 8px;
+  font-weight:700;
+}
+
+/* on masque la ligne “row” que tu as vidée si elle existe encore */
+#cases-grid .card .row{ display:none; }
+
+/* Bouton prix orange */
+#cases-grid .card .view-case{
+  margin-top:6px;
+  padding:8px 14px;
+  border-radius:999px;
+  font-weight:700;
+  border:1px solid transparent;
+  background: var(--orange);
+  color:#0b0f14;                /* lisible sur orange */
+  box-shadow: 0 6px 18px rgba(255,159,26,.25);
+}
+
+#cases-grid .card .view-case:hover{
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(255,159,26,.32);
+}
+
+#cases-grid .card .view-case .price{
+  font-weight:800;
+}
