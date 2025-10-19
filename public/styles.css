@@ -9,7 +9,16 @@
 }
 
 *{ box-sizing:border-box }
-html,body{ height:100% }
+html, body{
+  min-height:100%;
+  background:#0b0f14;               /* fond uni de sûreté */
+  background-image: linear-gradient(180deg,#0b0f14,#0e1520);
+  color:#e6edf3;
+}
+section, main, .container, #case-detail, #cd-items{
+  background: transparent !important;
+}
+
 body{
   margin:0;
   color:#e6edf3;
@@ -60,6 +69,7 @@ body{
   border-radius:18px;
   padding:36px 28px;
   box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    margin-bottom: 28px;   
 }
 .hero h1{ margin:0 0 6px 0; font-size:28px }
 .hero p{ margin:0 0 14px 0; color:var(--muted) }
@@ -138,25 +148,22 @@ input, select{
   object-fit:cover; border-radius:12px; border:1px solid var(--stroke);
 }
 #cd-open{ display:block; margin:6px auto 14px auto } /* bouton sous l’image, centré */
-#cd-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* 7 max selon largeur */
-  gap: 10px;                       /* moins d’espace */
-  justify-content: center;
-  justify-items: center;
-  align-items: start;
-  background: transparent;         /* garde le fond du site */
-  max-width: 950px;                /* compact et centré */
-  margin: 0 auto 40px auto;        /* centré avec marge basse */
+#cd-items{
+  display:grid;
+  grid-template-columns: repeat(7, 140px);   /* 7 items par ligne */
+  gap: 0;                                     /* pas d'espace entre cartes */
+  justify-content:center;                     /* centré */
+  align-items:start;
+  margin: 10px auto 40px;                     /* un peu d'air en bas */
+  background: transparent;                    /* pas de fond blanc */
+  max-width: 980px;                           /* 7 * 140 = 980 */
 }
-
-#cd-items .card {
-  width: 120px;                    /* taille réduite des items */
-  padding: 8px;
-  border-radius: 10px;
-  background: var(--card);
-  border: 1px solid #1e2a39;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+#cd-items .card{
+  width:140px;
+  padding:8px;
+  border-radius:10px;
+  background:var(--card);
+  border:1px solid #1e2a39;
 }
 
 #cd-items .card:hover {
@@ -164,11 +171,11 @@ input, select{
   box-shadow: 0 4px 10px rgba(0,0,0,0.35), 0 0 10px rgba(90,200,250,0.1);
 }
 
-#cd-items img {
-  width: 100%;
-  height: 80px;                   /* taille réduite des images */
-  object-fit: contain;
-  border-radius: 8px;
+#cd-items img{
+  width:100%;
+  height:84px;                                /* taille réduite */
+  object-fit:contain;
+  border-radius:8px;
 }
 
 
