@@ -28,6 +28,15 @@
   </header>
 
   <main class="container">
+    <section class="hero">
+  <h1>Spin. Win. Repeat.</h1>
+  <p>Open curated cases and build your inventory. Fair odds. Clean UX.</p>
+  <div class="hero-actions">
+    <a href="#" id="nav-cases" class="btn">Browse cases</a>
+    <button id="btn-deposit" class="btn">Deposit</button>
+  </div>
+</section>
+
     <!-- Cases grid -->
     <section id="cases-grid" class="grid"></section>
 
@@ -98,23 +107,21 @@
   </div>
 
   <!-- Case detail page -->
-  <section id="case-detail" class="hidden">
-    <div class="row" style="margin-bottom:8px">
-      <button id="back-to-cases">← Back to cases</button>
-      <h2 id="cd-name" style="margin:0 8px"></h2>
-      <span id="cd-price" class="badge"></span>
-    </div>
+ <section id="case-detail" class="hidden">
+  <div class="case-header">
+    <button id="back-to-cases">← Back to cases</button>
+    <h2 id="cd-name" style="margin:0 8px"></h2>
+    <span id="cd-price" class="badge"></span>
+  </div>
 
-    <img id="cd-image" src="" alt=""
-         style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;border:1px solid #223146;margin-bottom:12px"/>
+  <img id="cd-image" src="" alt="Case image" />
 
-    <h3>Possible drops</h3>
-    <div id="cd-items" class="grid"></div>
+  <button id="cd-open" class="btn">Open case</button>
 
-    <div class="row" style="margin-top:12px">
-      <button id="cd-open">Open case</button>
-    </div>
-  </section>
+  <h3 style="text-align:center;margin:10px 0 6px">Possible drops</h3>
+  <div id="cd-items"></div>
+</section>
+
 
   <!-- Deposit modal -->
   <div id="deposit-modal" class="modal hidden">
