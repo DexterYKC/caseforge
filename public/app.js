@@ -11,8 +11,10 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc,
-  collection, getDocs, addDoc, serverTimestamp, runTransaction
+  collection, getDocs, addDoc, serverTimestamp, runTransaction,
+  onSnapshot, deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
 
 // ---- CONFIG
 const firebaseConfig = {
@@ -96,7 +98,12 @@ onAuthStateChanged(auth, async (user)=>{
   show('#auth-modal', false);
   show('#nav-admin', !!user && ADMIN_EMAILS.includes(user.email));
 
-  if(!user){ $('#balance').textContent = '$0.00'; return; }
+  if (!user) {
+  $('#balance').textContent = '$0.00';
+  if (invUnsub) { invUnsub(); invUnsub = null; }
+  return;
+}
+
 
   // ensure user doc
   const uref = doc(db,'users', user.uid);
@@ -106,6 +113,8 @@ onAuthStateChanged(auth, async (user)=>{
   }
   state.userDoc = (await getDoc(uref)).data();
   $('#balance').textContent = fmt(state.userDoc.balance);
+  subscribeInventory();
+
 });
 
 // ===================
@@ -225,14 +234,21 @@ async function openCase(c){
     show('#open-again', true);
     $('#open-again').onclick = ()=> openSelectedCase();
 
-    // Persiste le spin + inventaire
-    const spinRef = await addDoc(collection(db,'spins'),{
-      uid: state.user.uid, caseId: c.id, item: win, price: c.price,
-      ts: serverTimestamp(), roll: Math.random()
-    });
-    await addDoc(collection(db,'users',state.user.uid,'inventory'),{
-      item: win, spinId: spinRef.id, ts: serverTimestamp()
-    });
+   // Persiste le spin + inventaire (stockage à plat pour l’UI et la vente)
+const spinRef = await addDoc(collection(db,'spins'),{
+  uid: state.user.uid, caseId: c.id, item: win, price: c.price,
+  ts: serverTimestamp(), roll: Math.random()
+});
+await addDoc(collection(db,'users',state.user.uid,'inventory'),{
+  name:  win.name,
+  value: Number(win.value || 0),
+  rarity: win.rarity || '',
+  img:   win.img || '',
+  item:  win,            // on garde l’objet complet si besoin
+  spinId: spinRef.id,
+  ts: serverTimestamp()
+});
+
 
     // Sync balance (sécurité)
     const snap = await getDoc(doc(db,'users',state.user.uid));
@@ -240,6 +256,70 @@ async function openCase(c){
   }, 2400);
 }
 $('#close-open').onclick = ()=> show('#open-modal', false);
+
+let invUnsub = null;
+
+function subscribeInventory() {
+  // coupe l’ancien abonnement si l’utilisateur change
+  if (invUnsub) { invUnsub(); invUnsub = null; }
+  if (!state.user) return;
+
+  const ref = collection(db, 'users', state.user.uid, 'inventory');
+  invUnsub = onSnapshot(ref, snap => {
+    const invGrid = $('#inv-grid'); 
+    if (!invGrid) return;
+    invGrid.innerHTML = '';
+    if (snap.empty) {
+      invGrid.innerHTML = '<div class="muted">Your inventory is empty.</div>';
+      return;
+    }
+    snap.forEach(d => {
+      const it = d.data().item || d.data(); // fallback si structure différente
+      const id = d.id;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <img src="${it.img || 'https://picsum.photos/400'}"
+             style="width:100%;height:120px;object-fit:cover;border-radius:12px"/>
+        <h4>${it.name}</h4>
+        <div class="badge">${it.rarity || ''}</div>
+        <div class="price">${fmt(it.value)}</div>
+        <button class="sell-btn" data-id="${id}" data-value="${Number(it.value||0)}">Sell</button>
+      `;
+      invGrid.appendChild(card);
+    });
+  });
+}
+
+// délégation: click sur bouton “Sell”
+document.body.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('.sell-btn');
+  if (!btn) return;
+  if (!state.user) { show('#auth-modal', true); return; }
+
+  const itemId = btn.dataset.id;
+  const val = Number(btn.dataset.value||0);
+
+  try{
+    // 1) crédite la balance en transaction
+    await runTransaction(db, async (tx)=>{
+      const uref = doc(db,'users',state.user.uid);
+      const usnap = await tx.get(uref);
+      const u = usnap.data() || { balance:0 };
+      tx.update(uref, { balance: (u.balance||0) + val });
+    });
+    // 2) supprime l’item vendu
+    await deleteDoc(doc(db, 'users', state.user.uid, 'inventory', itemId));
+
+    // 3) maj header direct
+    const snap = await getDoc(doc(db,'users',state.user.uid));
+    state.userDoc = snap.data();
+    $('#balance').textContent = fmt(state.userDoc.balance);
+  }catch(err){
+    console.error('Sell failed:', err);
+    alert(err.message || 'Sell failed');
+  }
+});
 
 // ===================
 // Inventory
