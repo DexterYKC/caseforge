@@ -157,39 +157,77 @@ $('#nav-inventory').onclick = async ()=>{
   });
 };
 
-// ==== Deposits (codes + proxy placeholder) ====
-$('#btn-deposit').onclick = ()=> show('#deposit-modal', true);
-$('#close-dep').onclick   = ()=> show('#deposit-modal', false);
-$('#redeem-toggle').onclick = ()=> $('#redeem-wrap').classList.toggle('hidden');
+// ==== Deposits (robuste : délégation + Esc + backdrop) ====
+const depModal = document.querySelector('#deposit-modal');
 
-$('#redeem-do').onclick = async ()=>{
-  if(!state.user) return;
-  const code = $('#redeem-code').value.trim();
-  const map = { TEST10:10, TEST25:25, TEST50:50 };
-  const amount = map[code];
-  if(!amount){ $('#dep-status').textContent='Invalid code'; return; }
-  await runTransaction(db, async (tx)=>{
-    const uref = doc(db,'users',state.user.uid);
-    const usnap = await tx.get(uref);
-    const u = usnap.data();
-    tx.update(uref,{ balance:(u.balance||0)+amount });
+// Délégation: on accroche sur <body>, pas sur chaque bouton
+document.body.addEventListener('click', (e) => {
+  const id = e.target.id;
+
+  if (id === 'btn-deposit') {
+    show('#deposit-modal', true);
+  }
+
+  if (id === 'close-dep') {
+    show('#deposit-modal', false);
+  }
+
+  if (id === 'redeem-toggle') {
+    document.querySelector('#redeem-wrap')?.classList.toggle('hidden');
+  }
+
+  if (id === 'redeem-do') {
+    (async () => {
+      if (!state.user) return;
+      const code = document.querySelector('#redeem-code').value.trim();
+      const map = { TEST10: 10, TEST25: 25, TEST50: 50 };
+      const amount = map[code];
+      if (!amount) {
+        document.querySelector('#dep-status').textContent = 'Invalid code';
+        return;
+      }
+      await runTransaction(db, async (tx) => {
+        const uref = doc(db, 'users', state.user.uid);
+        const usnap = await tx.get(uref);
+        const u = usnap.data();
+        tx.update(uref, { balance: (u.balance || 0) + amount });
+      });
+      document.querySelector('#dep-status').textContent = `Redeemed ${fmt(amount)}`;
+      const snap = await getDoc(doc(db, 'users', state.user.uid));
+      document.querySelector('#balance').textContent = fmt(snap.data().balance);
+    })();
+  }
+
+  if (id === 'dep-create') {
+    (async () => {
+      const amount = Number(document.getElementById('dep-amount').value || 0);
+      if (amount < 5) { document.getElementById('dep-status').textContent = 'Minimum is $5'; return; }
+      if (!PROXY_BASE) { document.getElementById('dep-status').textContent = 'No payment proxy configured'; return; }
+      try {
+        const r = await fetch(`${PROXY_BASE}/api/nowpayments/create-invoice`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amountUSD: amount, uid: state.user.uid })
+        });
+        const data = await r.json();
+        if (!data || !data.invoice_url) throw new Error('Bad response');
+        document.getElementById('dep-status').innerHTML =
+          `<a href="${data.invoice_url}" target="_blank">Open crypto checkout</a>`;
+      } catch (err) {
+        document.getElementById('dep-status').textContent = 'Failed to create invoice';
+      }
+    })();
+  }
+});
+
+// Fermer avec Échap
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') show('#deposit-modal', false);
+});
+
+// Fermer en cliquant sur le fond (backdrop)
+if (depModal) {
+  depModal.addEventListener('click', (e) => {
+    if (e.target === depModal) show('#deposit-modal', false);
   });
-  $('#dep-status').textContent = `Redeemed ${fmt(amount)}`;
-  const snap = await getDoc(doc(db,'users',state.user.uid));
-  $('#balance').textContent = fmt(snap.data().balance);
-};
+}
 
-$('#dep-create').onclick = async ()=>{
-  const amount = Number($('#dep-amount').value||0);
-  if(amount < 5){ $('#dep-status').textContent='Minimum is $5'; return; }
-  if(!PROXY_BASE){ $('#dep-status').textContent='No payment proxy configured'; return; }
-  try{
-    const r = await fetch(`${PROXY_BASE}/api/nowpayments/create-invoice`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ amountUSD: amount, uid: state.user.uid })
-    });
-    const data = await r.json();
-    if(!data || !data.invoice_url) throw new Error('Bad response');
-    $('#dep-status').innerHTML = `<a href="${data.invoice_url}" target="_blank">Open crypto checkout</a>`;
-  }catch(e){ $('#dep-status').textContent = 'Failed to create invoice'; }
-};
