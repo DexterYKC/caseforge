@@ -140,13 +140,37 @@ input, select{
 #cd-open{ display:block; margin:6px auto 14px auto } /* bouton sous l’image, centré */
 #cd-items {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  max-width: 780px;             /* limite la largeur totale */
-  margin: 0 auto 60px auto;     /* centre horizontalement + espace bas */
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* 7 max selon largeur */
+  gap: 10px;                       /* moins d’espace */
   justify-content: center;
   justify-items: center;
+  align-items: start;
+  background: transparent;         /* garde le fond du site */
+  max-width: 950px;                /* compact et centré */
+  margin: 0 auto 40px auto;        /* centré avec marge basse */
 }
+
+#cd-items .card {
+  width: 120px;                    /* taille réduite des items */
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid #1e2a39;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#cd-items .card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.35), 0 0 10px rgba(90,200,250,0.1);
+}
+
+#cd-items img {
+  width: 100%;
+  height: 80px;                   /* taille réduite des images */
+  object-fit: contain;
+  border-radius: 8px;
+}
+
 
 
 /* ---------- +$ effect ---------- */
