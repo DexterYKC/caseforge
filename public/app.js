@@ -32,6 +32,18 @@ const state = { user:null, userDoc:null, cases:[], selectedCase:null };
 const fmt = n => `$${Number(n||0).toFixed(2)}`;
 const show = (sel, yes=true)=>{ const el=$(sel); if(el) el.classList.toggle('hidden', !yes); };
 
+$('#nav-cases').onclick = () => {
+  showView('cases');
+};
+
+$('#nav-inventory').onclick = async () => {
+  if(!state.user){ show('#auth-modal', true); return; }
+  showView('inventory');
+  await loadInventory();
+};
+$('#nav-home').onclick = () => { showView('cases'); };
+
+
 // ==== Auth UI ====
 $('#btn-login').onclick  = ()=> show('#auth-modal', true);
 $('#close-auth').onclick = ()=> show('#auth-modal', false);
@@ -218,4 +230,90 @@ document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') show('#depos
 // Clic sur le fond = fermer
 if (depModal) {
   depModal.addEventListener('click', (e)=>{ if (e.target === depModal) show('#deposit-modal', false); });
+}
+
+function showView(view){
+  show('#cases-grid', view === 'cases');
+  show('#inventory', view === 'inventory');
+  show('#case-detail', view === 'detail');
+}
+
+function renderCases(){
+  const grid = $('#cases-grid'); grid.innerHTML='';
+  state.cases.forEach(c=>{
+    const card = document.createElement('div');
+    card.className='card';
+    card.innerHTML = `
+      <img src="${c.image||'https://picsum.photos/600/300?blur=2'}" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:12px"/>
+      <h4>${c.name}</h4>
+      <div class="row"><span class="badge">${c.items?.length||0} items</span><span class="price">${fmt(c.price)}</span></div>
+      <button class="view-case">View</button>`;
+    card.querySelector('.view-case').onclick = ()=> showCaseDetail(c);
+    grid.appendChild(card);
+  });
+}
+
+function showCaseDetail(c){
+  state.selectedCase = c;
+  $('#cd-name').textContent  = c.name;
+  $('#cd-price').textContent = `Price: ${fmt(c.price)}`;
+  $('#cd-image').src         = c.image || 'https://picsum.photos/800/400?blur=1';
+
+  const list = $('#cd-items'); list.innerHTML = '';
+  (c.items||[]).forEach(it=>{
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <img src="${it.img||'https://picsum.photos/200'}" style="width:100%;height:120px;object-fit:cover;border-radius:12px"/>
+      <h4>${it.name}</h4>
+      <div class="badge">${it.rarity||''}</div>
+      <div class="price">${fmt(it.value)}</div>`;
+    list.appendChild(div);
+  });
+
+  $('#cd-open').onclick = () => openSelectedCase();
+  $('#back-to-cases').onclick = () => showView('cases');
+
+  showView('detail');
+}
+
+async function openSelectedCase(){
+  const c = state.selectedCase;
+  if(!c){ return; }
+  if(!state.user){ show('#auth-modal', true); return; }
+
+  // Transaction Firestore pour débiter
+  try{
+    await runTransaction(db, async (tx)=>{
+      const uref = doc(db,'users',state.user.uid);
+      const usnap = await tx.get(uref);
+      const u = usnap.data();
+      if(!u || (u.balance||0) < c.price) throw new Error('Insufficient balance');
+      tx.update(uref,{ balance:(u.balance||0) - c.price });
+    });
+  }catch(e){ alert(e.message); return; }
+
+  // 🔥 MAJ UI immédiate (sans refresh)
+  if(state.userDoc){
+    state.userDoc.balance = (state.userDoc.balance||0) - c.price;
+    $('#balance').textContent = fmt(state.userDoc.balance);
+  }
+
+  // Ouvre l’animation (réutilise ton open modal existant)
+  openCase(c); // ta fonction existante qui anime la roulette et enregistre le spin
+}
+
+async function loadInventory(){
+  const invGrid = $('#inv-grid'); invGrid.innerHTML='';
+  const items = await getDocs(collection(db,'users',state.user.uid,'inventory'));
+  items.forEach(d=>{
+    const it = d.data().item;
+    const card = document.createElement('div'); card.className='card';
+    card.innerHTML = `
+      <img src="${it.img||'https://picsum.photos/400'}" style="width:100%;height:120px;object-fit:cover;border-radius:12px"/>
+      <h4>${it.name}</h4>
+      <div class="badge">${it.rarity||''}</div>
+      <div class="price">${fmt(it.value)}</div>`;
+    invGrid.appendChild(card);
+  });
 }
