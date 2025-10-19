@@ -138,12 +138,16 @@ input, select{
   object-fit:cover; border-radius:12px; border:1px solid var(--stroke);
 }
 #cd-open{ display:block; margin:6px auto 14px auto } /* bouton sous l’image, centré */
-#cd-items{
-  display:grid; gap:14px;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  justify-content:center;                 /* centre la grille */
-  justify-items:center;                   /* centre les cartes */
+#cd-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  max-width: 780px;             /* limite la largeur totale */
+  margin: 0 auto 60px auto;     /* centre horizontalement + espace bas */
+  gap: 16px;
+  justify-content: center;
+  justify-items: center;
 }
+
 
 /* ---------- +$ effect ---------- */
 .money-fx{ position:fixed; transform:translate(-50%,0); font-weight:700; font-size:14px;
