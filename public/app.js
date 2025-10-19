@@ -158,20 +158,13 @@ $('#nav-inventory').onclick = async ()=>{
 };
 
 // ==== Deposits (robuste : délégation + Esc + backdrop) ====
-// 1) Références une seule fois
 const depModal = document.querySelector('#deposit-modal');
 
-// 2) Délégation de clics sur <body> (capte btn-deposit / close / redeem / create)
 document.body.addEventListener('click', (e) => {
   const id = e.target.id;
 
-  if (id === 'btn-deposit') {
-    show('#deposit-modal', true);
-  }
-
-  if (id === 'close-dep') {
-    show('#deposit-modal', false);
-  }
+  if (id === 'btn-deposit') show('#deposit-modal', true);
+  if (id === 'close-dep')   show('#deposit-modal', false);
 
   if (id === 'redeem-toggle') {
     document.querySelector('#redeem-wrap')?.classList.toggle('hidden');
@@ -181,53 +174,48 @@ document.body.addEventListener('click', (e) => {
     (async () => {
       if (!state.user) return;
       const code = document.querySelector('#redeem-code').value.trim();
-      const map = { TEST10: 10, TEST25: 25, TEST50: 50 };
+      const map = { TEST10:10, TEST25:25, TEST50:50 };
       const amount = map[code];
       if (!amount) { document.querySelector('#dep-status').textContent = 'Invalid code'; return; }
 
       await runTransaction(db, async (tx) => {
-        const uref = doc(db, 'users', state.user.uid);
+        const uref  = doc(db,'users',state.user.uid);
         const usnap = await tx.get(uref);
         const u = usnap.data();
-        tx.update(uref, { balance: (u.balance || 0) + amount });
+        tx.update(uref,{ balance:(u.balance||0)+amount });
       });
 
       document.querySelector('#dep-status').textContent = `Redeemed ${fmt(amount)}`;
-      const snap = await getDoc(doc(db, 'users', state.user.uid));
+      const snap = await getDoc(doc(db,'users',state.user.uid));
       document.querySelector('#balance').textContent = fmt(snap.data().balance);
     })();
   }
 
   if (id === 'dep-create') {
     (async () => {
-      const amount = Number(document.getElementById('dep-amount').value || 0);
-      if (amount < 5) { document.getElementById('dep-status').textContent = 'Minimum is $5'; return; }
-      if (!PROXY_BASE) { document.getElementById('dep-status').textContent = 'No payment proxy configured'; return; }
+      const amount = Number(document.getElementById('dep-amount').value||0);
+      if (amount < 5) { document.getElementById('dep-status').textContent='Minimum is $5'; return; }
+      if (!PROXY_BASE) { document.getElementById('dep-status').textContent='No payment proxy configured'; return; }
       try {
-        const r = await fetch(`${PROXY_BASE}/api/nowpayments/create-invoice`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const r = await fetch(`${PROXY_BASE}/api/nowpayments/create-invoice`,{
+          method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ amountUSD: amount, uid: state.user.uid })
         });
         const data = await r.json();
         if (!data || !data.invoice_url) throw new Error('Bad response');
         document.getElementById('dep-status').innerHTML =
           `<a href="${data.invoice_url}" target="_blank">Open crypto checkout</a>`;
-      } catch (err) {
+      } catch(e) {
         document.getElementById('dep-status').textContent = 'Failed to create invoice';
       }
     })();
   }
 });
 
-// 3) Échap = fermer
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') show('#deposit-modal', false);
-});
+// Esc = fermer
+document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') show('#deposit-modal', false); });
 
-// 4) Clic sur le fond = fermer
+// Clic sur le fond = fermer
 if (depModal) {
-  depModal.addEventListener('click', (e) => {
-    if (e.target === depModal) show('#deposit-modal', false);
-  });
+  depModal.addEventListener('click', (e)=>{ if (e.target === depModal) show('#deposit-modal', false); });
 }
-
