@@ -2,19 +2,21 @@
 // CaseForge — app.js (CDN build)
 // ==============================
 
-// --- Firebase (CDN v12.4.0)
+// Firebase CDN imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
 import {
   getAuth, onAuthStateChanged,
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
-  setPersistence, browserLocalPersistence
+  setPersistence, browserLocalPersistence, sendEmailVerification
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, updateDoc,
   collection, getDocs, addDoc, serverTimestamp, runTransaction,
   onSnapshot, deleteDoc
 } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
-
+import {
+  getStorage, ref as sref, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/12.4.0/firebase-storage.js";
 
 // ---- CONFIG
 const firebaseConfig = {
@@ -25,15 +27,17 @@ const firebaseConfig = {
   messagingSenderId: "213272608509",
   appId: "1:213272608509:web:54853eefefe2abbe2d8894"
 };
-const ADMIN_EMAILS = ["ykacem59@gmail.com"]; // <<< ton email admin
-const PROXY_BASE   = ""; // ex: "https://your-proxy.onrender.com" (optionnel)
+const ADMIN_EMAILS = ["ykacem59@gmail.com"];
+const PROXY_BASE   = ""; // optional payment proxy
 
 // ---- INIT
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-// persistance de session
-(async ()=>{ try{ await setPersistence(auth, browserLocalPersistence); }catch(e){ console.warn(e); } })();
+const storage = getStorage(app);
+
+// session persistence
+(async ()=>{ try{ await setPersistence(auth, browserLocalPersistence); } catch(e){ console.warn(e); } })();
 
 // ---- Helpers
 const $     = (s)=>document.querySelector(s);
@@ -51,43 +55,95 @@ function showView(view){
 // ===================
 $('#nav-home').onclick  = ()=> showView('cases');
 $('#nav-cases').onclick = ()=> showView('cases');
-$('#nav-inventory').onclick = async ()=>{
+$('#nav-inventory').onclick = ()=>{
   if(!state.user){ show('#auth-modal', true); return; }
-  showView('inventory');
+  showView('inventory'); // inventory auto-renders via onSnapshot
 };
 
 // ===================
-// Auth UI
+// Auth UI (tabs)
 // ===================
 $('#btn-login').onclick  = ()=> show('#auth-modal', true);
 $('#close-auth').onclick = ()=> show('#auth-modal', false);
 $('#btn-logout').onclick = ()=> signOut(auth);
 
+$('#tab-login').onclick = ()=>{
+  $('#tab-login').classList.add('active'); $('#tab-signup').classList.remove('active');
+  show('#login-view', true); show('#signup-view', false);
+};
+$('#tab-signup').onclick = ()=>{
+  $('#tab-signup').classList.add('active'); $('#tab-login').classList.remove('active');
+  show('#login-view', false); show('#signup-view', true);
+};
+
+// Login
 $('#do-login').onclick = async ()=>{
   const e = $('#auth-email').value.trim();
   const p = $('#auth-pass').value.trim();
-  if($('#auth-status')) $('#auth-status').textContent = '';
+  $('#auth-status').textContent = '';
   try{
     await signInWithEmailAndPassword(auth, e, p);
   }catch(err){
     console.error(err);
-    if($('#auth-status')) $('#auth-status').textContent = err.code || err.message;
+    $('#auth-status').textContent = err.code || err.message;
   }
 };
 
+// Sign up with username + email verification
 $('#do-signup').onclick = async ()=>{
-  const e = $('#auth-email').value.trim();
-  const p = $('#auth-pass').value.trim();
-  if($('#auth-status')) $('#auth-status').textContent = '';
+  const uname = $('#su-username').value.trim().toLowerCase();
+  const email = $('#su-email').value.trim();
+  const pass1 = $('#su-pass').value; const pass2 = $('#su-pass2').value;
+  $('#auth-status').textContent = '';
+
+  if(!uname || !email || !pass1){ $('#auth-status').textContent = 'Fill all fields'; return; }
+  if(pass1 !== pass2){ $('#auth-status').textContent = 'Passwords don’t match'; return; }
+  if(!/^[a-z0-9_]{3,20}$/.test(uname)){ $('#auth-status').textContent = 'Username invalid'; return; }
+
   try{
-    const cred = await createUserWithEmailAndPassword(auth, e, p);
-    await setDoc(doc(db,'users', cred.user.uid), {
-      email:e, balance:0, role:'user', createdAt:serverTimestamp()
+    // reserve username via tx
+    const unameRef = doc(db,'usernames', uname);
+    await runTransaction(db, async (tx)=>{
+      const s = await tx.get(unameRef);
+      if (s.exists()) throw new Error('Username already taken');
+      // temp reservation; link uid after user created
     });
+
+    // create auth user
+    const cred = await createUserWithEmailAndPassword(auth, email, pass1);
+
+    // finalize username->uid
+    await runTransaction(db, async (tx)=>{
+      const s = await tx.get(unameRef);
+      if (s.exists()) throw new Error('Username already taken');
+      tx.set(unameRef, { uid: cred.user.uid, createdAt: serverTimestamp() });
+    });
+
+    // create user doc
+    await setDoc(doc(db,'users',cred.user.uid),{
+      email, username: uname, balance:0, role:'user',
+      level:1, xp:0, avatar:'', createdAt: serverTimestamp()
+    });
+
+    await sendEmailVerification(cred.user);
+    $('#auth-status').textContent = 'Verification email sent. Check your inbox.';
   }catch(err){
     console.error(err);
-    if($('#auth-status')) $('#auth-status').textContent = err.code || err.message;
+    $('#auth-status').textContent = err.message || err.code;
   }
+};
+
+// Avatar upload (bound once)
+$('#avatar-upload').onclick = async ()=>{
+  try{
+    const f = $('#avatar-file').files[0];
+    if(!f || !state.user) return;
+    const r = sref(storage, `avatars/${state.user.uid}.jpg`);
+    await uploadBytes(r, f);
+    const url = await getDownloadURL(r);
+    await updateDoc(doc(db,'users',state.user.uid), { avatar:url });
+    $('#avatar').src = url;
+  }catch(e){ alert('Upload failed'); console.error(e); }
 };
 
 onAuthStateChanged(auth, async (user)=>{
@@ -95,25 +151,33 @@ onAuthStateChanged(auth, async (user)=>{
   show('#btn-login', !user);
   show('#btn-logout', !!user);
   show('#auth-modal', false);
-  show('#nav-admin', !!user && ADMIN_EMAILS.includes(user.email));
+  show('#nav-admin', !!user && ADMIN_EMAILS.includes(user?.email));
 
-  if (!user) {
-  $('#balance').textContent = '$0.00';
-  if (invUnsub) { invUnsub(); invUnsub = null; }
-  return;
-}
+  if(user && !user.emailVerified){
+    console.warn('Email not verified');
+    // If you want to hard-block case openings, flip a flag here.
+  }
 
+  if(!user){
+    $('#balance').textContent = '$0.00';
+    if (invUnsub) { invUnsub(); invUnsub = null; }
+    return;
+  }
 
   // ensure user doc
   const uref = doc(db,'users', user.uid);
   const snap = await getDoc(uref);
   if(!snap.exists()){
-    await setDoc(uref, { email:user.email, balance:0, role:'user', createdAt:serverTimestamp() });
+    await setDoc(uref, { email:user.email, balance:0, role:'user', level:1, xp:0, avatar:'', createdAt:serverTimestamp() });
   }
-  state.userDoc = (await getDoc(uref)).data();
-  $('#balance').textContent = fmt(state.userDoc.balance);
-  subscribeInventory();
 
+  state.userDoc = (await getDoc(uref)).data();
+  $('#balance').textContent   = fmt(state.userDoc.balance||0);
+  $('#pf-username').textContent = state.userDoc.username || user.email || '';
+  $('#pf-level').textContent    = `Level ${state.userDoc.level||1} — ${state.userDoc.xp||0} XP`;
+  $('#avatar').src              = state.userDoc.avatar || 'https://picsum.photos/80';
+
+  subscribeInventory();
 });
 
 // ===================
@@ -180,12 +244,28 @@ function weightedPick(items){
   return items.at(-1);
 }
 
+async function addXP(amount=10){
+  if(!state.user) return;
+  await runTransaction(db, async (tx)=>{
+    const uref = doc(db,'users',state.user.uid);
+    const usnap = await tx.get(uref);
+    const u = usnap.data() || { xp:0, level:1 };
+    let xp = (u.xp||0) + amount;
+    let lvl = u.level||1;
+    const need = lvl*100; // basic curve
+    if (xp >= need){ xp -= need; lvl += 1; }
+    tx.update(uref, { xp, level: lvl });
+  });
+  const s = await getDoc(doc(db,'users',state.user.uid));
+  $('#pf-level').textContent = `Level ${s.data().level} — ${s.data().xp} XP`;
+}
+
 async function openSelectedCase(){
   const c = state.selectedCase;
   if(!c) return;
   if(!state.user){ show('#auth-modal', true); return; }
 
-  // Débit transactionnel
+  // debit transaction
   try{
     await runTransaction(db, async (tx)=>{
       const uref = doc(db,'users',state.user.uid);
@@ -196,20 +276,30 @@ async function openSelectedCase(){
     });
   }catch(e){ alert(e.message); return; }
 
-  // MAJ UI immédiate
+  // optimistic UI
   if(state.userDoc){
     state.userDoc.balance = (state.userDoc.balance||0) - c.price;
     $('#balance').textContent = fmt(state.userDoc.balance);
   }
 
-  // Lance l'animation
   openCase(c);
 }
 
 async function openCase(c){
   $('#open-title').textContent = `Opening ${c.name}…`;
-  const strip = document.createElement('div'); strip.className='strip';
-  const pool  = [...c.items, ...c.items, ...c.items];
+
+  const wheel = $('#wheel'); wheel.innerHTML = '';
+  const strip = document.createElement('div'); strip.className = 'strip';
+  wheel.appendChild(strip);
+
+  const VIS_COUNT = 60;
+  const CENTER    = Math.floor(VIS_COUNT/2);
+  const win = weightedPick(c.items);
+
+  const rand = ()=> c.items[Math.floor(Math.random()*c.items.length)];
+  const pool = Array.from({length: VIS_COUNT}, rand);
+  pool[CENTER] = win;
+
   pool.forEach(i=>{
     const cell = document.createElement('div');
     cell.className = 'item';
@@ -219,13 +309,18 @@ async function openCase(c){
       <div class="badge">${i.rarity||''}</div>`;
     strip.appendChild(cell);
   });
-  const wheel = $('#wheel'); wheel.innerHTML=''; wheel.appendChild(strip);
+
+  strip.style.transition = 'none';
+  strip.style.transform  = 'translateX(0px)';
   show('#open-modal', true);
 
-  const win   = weightedPick(c.items);
-  const index = Math.floor(Math.random()*pool.length);
-  const offset = -(index*128 + 10);
-  requestAnimationFrame(()=> strip.style.transform = `translateX(${offset}px)`);
+  await new Promise(r=> requestAnimationFrame(r));
+  const cellW = strip.querySelector('.item').getBoundingClientRect().width + 8;
+  const targetOffset = -(CENTER*cellW - (wheel.clientWidth/2 - cellW/2));
+
+  await new Promise(r=> requestAnimationFrame(r));
+  strip.style.transition = 'transform 2.6s cubic-bezier(.08,.9,.05,1)';
+  strip.style.transform  = `translateX(${targetOffset}px)`;
 
   setTimeout(async ()=>{
     $('#result').textContent = `You won: ${win.name} (${fmt(win.value)})`;
@@ -233,33 +328,50 @@ async function openCase(c){
     show('#open-again', true);
     $('#open-again').onclick = ()=> openSelectedCase();
 
-   // Persiste le spin + inventaire (stockage à plat pour l’UI et la vente)
-const spinRef = await addDoc(collection(db,'spins'),{
-  uid: state.user.uid, caseId: c.id, item: win, price: c.price,
-  ts: serverTimestamp(), roll: Math.random()
-});
-await addDoc(collection(db,'users',state.user.uid,'inventory'),{
-  name:  win.name,
-  value: Number(win.value || 0),
-  rarity: win.rarity || '',
-  img:   win.img || '',
-  item:  win,            // on garde l’objet complet si besoin
-  spinId: spinRef.id,
-  ts: serverTimestamp()
-});
+    // persist spin + inventory (flat shape for Sell)
+    const spinRef = await addDoc(collection(db,'spins'),{
+      uid: state.user.uid, caseId: c.id, item: win, price: c.price,
+      ts: serverTimestamp(), roll: Math.random()
+    });
+    await addDoc(collection(db,'users',state.user.uid,'inventory'),{
+      name:  win.name,
+      value: Number(win.value || 0),
+      rarity: win.rarity || '',
+      img:   win.img || '',
+      item:  win,
+      spinId: spinRef.id,
+      ts: serverTimestamp()
+    });
 
-
-    // Sync balance (sécurité)
+    // resync balance (safety)
     const snap = await getDoc(doc(db,'users',state.user.uid));
     $('#balance').textContent = fmt((snap.data()?.balance)||0);
-  }, 2400);
+
+    // XP tick
+    await addXP(10);
+  }, 2700);
 }
+
+function bumpBalance(delta){
+  if(!delta) return;
+  const b = $('#balance');
+  const rect = b.getBoundingClientRect();
+  const fx = document.createElement('div');
+  fx.className = 'money-fx';
+  fx.textContent = `+${Number(delta).toFixed(2)}`;
+  fx.style.left = (rect.left + rect.width/2) + 'px';
+  fx.style.top  = (rect.top - 4) + 'px';
+  document.body.appendChild(fx);
+  setTimeout(()=> fx.remove(), 900);
+}
+
 $('#close-open').onclick = ()=> show('#open-modal', false);
 
+// ===================
+// Inventory (live)
+// ===================
 let invUnsub = null;
-
 function subscribeInventory() {
-  // coupe l’ancien abonnement si l’utilisateur change
   if (invUnsub) { invUnsub(); invUnsub = null; }
   if (!state.user) return;
 
@@ -273,7 +385,7 @@ function subscribeInventory() {
       return;
     }
     snap.forEach(d => {
-      const it = d.data().item || d.data(); // fallback si structure différente
+      const it = d.data().item || d.data();
       const id = d.id;
       const card = document.createElement('div');
       card.className = 'card';
@@ -290,39 +402,7 @@ function subscribeInventory() {
   });
 }
 
-// délégation: click sur bouton “Sell”
-document.body.addEventListener('click', async (e)=>{
-  const btn = e.target.closest('.sell-btn');
-  if (!btn) return;
-  if (!state.user) { show('#auth-modal', true); return; }
-
-  const itemId = btn.dataset.id;
-  const val = Number(btn.dataset.value||0);
-
-  try{
-    // 1) crédite la balance en transaction
-    await runTransaction(db, async (tx)=>{
-      const uref = doc(db,'users',state.user.uid);
-      const usnap = await tx.get(uref);
-      const u = usnap.data() || { balance:0 };
-      tx.update(uref, { balance: (u.balance||0) + val });
-    });
-    // 2) supprime l’item vendu
-    await deleteDoc(doc(db, 'users', state.user.uid, 'inventory', itemId));
-
-    // 3) maj header direct
-    const snap = await getDoc(doc(db,'users',state.user.uid));
-    state.userDoc = snap.data();
-    $('#balance').textContent = fmt(state.userDoc.balance);
-  }catch(err){
-    console.error('Sell failed:', err);
-    alert(err.message || 'Sell failed');
-  }
-});
-
-// ===================
-// Inventory
-// ===================
+// Optional one-shot loader (not strictly needed with onSnapshot)
 async function loadInventory(){
   const invGrid = $('#inv-grid'); invGrid.innerHTML='';
   const items = await getDocs(collection(db,'users',state.user.uid,'inventory'));
@@ -331,7 +411,7 @@ async function loadInventory(){
     return;
   }
   items.forEach(d=>{
-    const it = d.data().item || d.data(); // <<< fallback important
+    const it = d.data().item || d.data();
     const id = d.id;
     const card = document.createElement('div'); card.className='card';
     card.innerHTML = `
@@ -346,9 +426,39 @@ async function loadInventory(){
   });
 }
 
+// Sell via event delegation
+document.body.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('.sell-btn');
+  if (!btn) return;
+  if (!state.user) { show('#auth-modal', true); return; }
+
+  const itemId = btn.dataset.id;
+  const val = Number(btn.dataset.value||0);
+
+  try{
+    // credit balance
+    await runTransaction(db, async (tx)=>{
+      const uref = doc(db,'users',state.user.uid);
+      const usnap = await tx.get(uref);
+      const u = usnap.data() || { balance:0 };
+      tx.update(uref, { balance: (u.balance||0) + val });
+    });
+    // remove item
+    await deleteDoc(doc(db, 'users', state.user.uid, 'inventory', itemId));
+    // update header
+    const snap = await getDoc(doc(db,'users',state.user.uid));
+    state.userDoc = snap.data();
+    $('#balance').textContent = fmt(state.userDoc.balance);
+    // fx
+    bumpBalance(val);
+  }catch(err){
+    console.error('Sell failed:', err);
+    alert(err.message || 'Sell failed');
+  }
+});
 
 // ===================
-// Deposits (codes + proxy placeholder) — robuste
+// Deposits (codes + proxy placeholder)
 // ===================
 const depModal = document.querySelector('#deposit-modal');
 
@@ -404,7 +514,7 @@ document.body.addEventListener('click', (e)=>{
   }
 });
 
-// Esc + backdrop pour fermer
+// Esc + backdrop
 document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') show('#deposit-modal', false); });
 if (depModal) {
   depModal.addEventListener('click', (e)=>{ if(e.target===depModal) show('#deposit-modal', false); });

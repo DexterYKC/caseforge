@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CaseForge — Demo</title>
   <link rel="stylesheet" href="styles.css" />
+  <!-- Add the CSS snippet for roulette + money effect in styles.css:
+       (see assistant message for the block – wheel/strip/item + .money-fx)
+  -->
 </head>
 <body>
   <header class="topbar">
@@ -24,29 +27,63 @@
   </header>
 
   <main class="container">
+    <!-- Cases grid -->
     <section id="cases-grid" class="grid"></section>
 
+    <!-- Inventory + profile -->
     <section id="inventory" class="hidden">
       <h2>Your Inventory</h2>
+
+      <section id="profile" style="margin-bottom:16px">
+        <div class="row" style="gap:12px; align-items:center">
+          <img id="avatar" src="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:1px solid #223146"/>
+          <div>
+            <div id="pf-username" class="bold"></div>
+            <div id="pf-level" class="muted"></div>
+          </div>
+          <input id="avatar-file" type="file" accept="image/*" style="margin-left:auto"/>
+          <button id="avatar-upload">Change photo</button>
+        </div>
+      </section>
+
       <div id="inv-grid" class="grid"></div>
     </section>
   </main>
 
-  <!-- Login modal -->
+  <!-- Auth modal -->
   <div id="auth-modal" class="modal hidden">
     <div class="modal-card">
       <h3>Login / Sign up</h3>
-      <input id="auth-email" type="email" placeholder="email" />
-      <input id="auth-pass" type="password" placeholder="password" />
-      <div class="row">
-        <button id="do-login">Login</button>
-        <button id="do-signup">Sign up</button>
+
+      <div class="tabs row" style="gap:8px;margin-bottom:8px">
+        <button id="tab-login"  class="active">Login</button>
+        <button id="tab-signup">Sign up</button>
       </div>
+
+      <div id="login-view">
+        <input id="auth-email" type="email" placeholder="email" />
+        <input id="auth-pass"  type="password" placeholder="password" />
+        <div class="row">
+          <button id="do-login">Login</button>
+        </div>
+      </div>
+
+      <div id="signup-view" class="hidden">
+        <input id="su-username"  placeholder="username (unique)" />
+        <input id="su-email"     type="email" placeholder="email" />
+        <input id="su-pass"      type="password" placeholder="password" />
+        <input id="su-pass2"     type="password" placeholder="confirm password" />
+        <div class="row">
+          <button id="do-signup">Create account</button>
+        </div>
+      </div>
+
+      <div id="auth-status" class="warn"></div>
       <button class="link" id="close-auth">close</button>
     </div>
   </div>
 
-  <!-- Case open modal -->
+  <!-- Open modal (roulette) -->
   <div id="open-modal" class="modal hidden">
     <div class="modal-card">
       <h3 id="open-title">Opening…</h3>
@@ -58,44 +95,45 @@
       </div>
     </div>
   </div>
+
+  <!-- Case detail page -->
+  <section id="case-detail" class="hidden">
+    <div class="row" style="margin-bottom:8px">
+      <button id="back-to-cases">← Back to cases</button>
+      <h2 id="cd-name" style="margin:0 8px"></h2>
+      <span id="cd-price" class="badge"></span>
+    </div>
+
+    <img id="cd-image" src="" alt=""
+         style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;border:1px solid #223146;margin-bottom:12px"/>
+
+    <h3>Possible drops</h3>
+    <div id="cd-items" class="grid"></div>
+
+    <div class="row" style="margin-top:12px">
+      <button id="cd-open">Open case</button>
+    </div>
+  </section>
+
   <!-- Deposit modal -->
-<div id="deposit-modal" class="modal hidden">
-  <div class="modal-card">
-    <h3>Deposit</h3>
-    <label>Amount (USD)</label>
-    <input id="dep-amount" type="number" min="1" step="1" value="10" />
-    <div class="row">
-      <button id="dep-create">Create invoice (proxy)</button>
-      <button id="redeem-toggle">Redeem code</button>
+  <div id="deposit-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Deposit</h3>
+      <label>Amount (USD)</label>
+      <input id="dep-amount" type="number" min="1" step="1" value="10" />
+      <div class="row">
+        <button id="dep-create">Create invoice (proxy)</button>
+        <button id="redeem-toggle">Redeem code</button>
+      </div>
+      <div id="redeem-wrap" class="hidden">
+        <input id="redeem-code" placeholder="Enter code (TEST10/25/50)" />
+        <button id="redeem-do">Redeem</button>
+      </div>
+      <div id="dep-status"></div>
+      <button class="link" id="close-dep"
+        onclick="document.querySelector('#deposit-modal').classList.add('hidden')">close</button>
     </div>
-    <div id="redeem-wrap" class="hidden">
-      <input id="redeem-code" placeholder="Enter code (TEST10/25/50)" />
-      <button id="redeem-do">Redeem</button>
-    </div>
-    <div id="dep-status"></div>
-    <!-- FAIL-SAFE: ferme même si JS est cassé -->
-    <button class="link" id="close-dep"
-      onclick="document.querySelector('#deposit-modal').classList.add('hidden')">close</button>
   </div>
-</div>
-<!-- Case detail page -->
-<section id="case-detail" class="hidden">
-  <div class="row" style="margin-bottom:8px">
-    <button id="back-to-cases">← Back to cases</button>
-    <h2 id="cd-name" style="margin:0 8px"></h2>
-    <span id="cd-price" class="badge"></span>
-  </div>
-
-  <img id="cd-image" src="" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;border:1px solid #223146;margin-bottom:12px"/>
-
-  <h3>Possible drops</h3>
-  <div id="cd-items" class="grid"></div>
-
-  <div class="row" style="margin-top:12px">
-    <button id="cd-open">Open case</button>
-  </div>
-</section>
-
 
   <script type="module" src="app.js"></script>
 </body>
