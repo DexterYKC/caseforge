@@ -158,9 +158,10 @@ $('#nav-inventory').onclick = async ()=>{
 };
 
 // ==== Deposits (robuste : délégation + Esc + backdrop) ====
+// 1) Références une seule fois
 const depModal = document.querySelector('#deposit-modal');
 
-// Délégation: on accroche sur <body>, pas sur chaque bouton
+// 2) Délégation de clics sur <body> (capte btn-deposit / close / redeem / create)
 document.body.addEventListener('click', (e) => {
   const id = e.target.id;
 
@@ -182,16 +183,15 @@ document.body.addEventListener('click', (e) => {
       const code = document.querySelector('#redeem-code').value.trim();
       const map = { TEST10: 10, TEST25: 25, TEST50: 50 };
       const amount = map[code];
-      if (!amount) {
-        document.querySelector('#dep-status').textContent = 'Invalid code';
-        return;
-      }
+      if (!amount) { document.querySelector('#dep-status').textContent = 'Invalid code'; return; }
+
       await runTransaction(db, async (tx) => {
         const uref = doc(db, 'users', state.user.uid);
         const usnap = await tx.get(uref);
         const u = usnap.data();
         tx.update(uref, { balance: (u.balance || 0) + amount });
       });
+
       document.querySelector('#dep-status').textContent = `Redeemed ${fmt(amount)}`;
       const snap = await getDoc(doc(db, 'users', state.user.uid));
       document.querySelector('#balance').textContent = fmt(snap.data().balance);
@@ -219,12 +219,12 @@ document.body.addEventListener('click', (e) => {
   }
 });
 
-// Fermer avec Échap
+// 3) Échap = fermer
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') show('#deposit-modal', false);
 });
 
-// Fermer en cliquant sur le fond (backdrop)
+// 4) Clic sur le fond = fermer
 if (depModal) {
   depModal.addEventListener('click', (e) => {
     if (e.target === depModal) show('#deposit-modal', false);
