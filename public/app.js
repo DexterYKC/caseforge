@@ -54,7 +54,6 @@ $('#nav-cases').onclick = ()=> showView('cases');
 $('#nav-inventory').onclick = async ()=>{
   if(!state.user){ show('#auth-modal', true); return; }
   showView('inventory');
-  await loadInventory();
 };
 
 // ===================
@@ -327,18 +326,26 @@ document.body.addEventListener('click', async (e)=>{
 async function loadInventory(){
   const invGrid = $('#inv-grid'); invGrid.innerHTML='';
   const items = await getDocs(collection(db,'users',state.user.uid,'inventory'));
+  if (items.empty) {
+    invGrid.innerHTML = '<div class="muted">Your inventory is empty.</div>';
+    return;
+  }
   items.forEach(d=>{
-    const it = d.data().item;
+    const it = d.data().item || d.data(); // <<< fallback important
+    const id = d.id;
     const card = document.createElement('div'); card.className='card';
     card.innerHTML = `
       <img src="${it.img||'https://picsum.photos/400'}"
            style="width:100%;height:120px;object-fit:cover;border-radius:12px"/>
       <h4>${it.name}</h4>
       <div class="badge">${it.rarity||''}</div>
-      <div class="price">${fmt(it.value)}</div>`;
+      <div class="price">${fmt(it.value)}</div>
+      <button class="sell-btn" data-id="${id}" data-value="${Number(it.value||0)}">Sell</button>
+    `;
     invGrid.appendChild(card);
   });
 }
+
 
 // ===================
 // Deposits (codes + proxy placeholder) — robuste
