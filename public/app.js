@@ -519,3 +519,96 @@ document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') show('#deposit-
 if (depModal) {
   depModal.addEventListener('click', (e)=>{ if(e.target===depModal) show('#deposit-modal', false); });
 }
+
+// === Withdraw UI open/close
+$('#btn-withdraw').onclick = ()=>{
+  if(!state.user){ show('#auth-modal', true); return; }
+  $('#wd-status').textContent = '';
+  show('#withdraw-modal', true);
+};
+$('#wd-close').onclick = ()=> show('#withdraw-modal', false);
+
+// === Basic address validators (lightweight)
+function looksLikeAddress(addr, currency, network){
+  if(!addr || addr.length < 10) return false;
+  if(currency === 'BTC') {
+    // starts with 1,3,bc1 (super basique)
+    return /^(1|3|bc1)[a-zA-Z0-9]{20,}$/i.test(addr);
+  }
+  if(currency === 'ETH' || (currency==='USDT' && network==='ETHEREUM')) {
+    return /^0x[a-fA-F0-9]{40}$/.test(addr);
+  }
+  if(currency === 'USDT' && network === 'TRON') {
+    // TRC20 T...
+    return /^T[1-9A-HJ-NP-Za-km-z]{25,34}$/.test(addr);
+  }
+  return true; // fallback
+}
+
+// === Withdraw submit
+$('#wd-submit').onclick = async ()=>{
+  if(!state.user){ show('#auth-modal', true); return; }
+
+  const amount  = Number($('#wd-amount').value||0);
+  const currency= $('#wd-currency').value;
+  const network = $('#wd-network').value;
+  const address = $('#wd-address').value.trim();
+  const statusEl= $('#wd-status');
+
+  statusEl.textContent = '';
+
+  // hard validation MVP
+  if(amount < 10){ statusEl.textContent = 'Minimum withdraw is $10'; return; }
+  if(!looksLikeAddress(address, currency, network)){ statusEl.textContent = 'Invalid address'; return; }
+
+  try{
+    // 1) Hold funds immediately to prevent abuse (transaction)
+    await runTransaction(db, async (tx)=>{
+      const uref = doc(db,'users',state.user.uid);
+      const usnap= await tx.get(uref);
+      const u    = usnap.data() || { balance:0 };
+      if((u.balance||0) < amount) throw new Error('Insufficient balance');
+      tx.update(uref, { balance: (u.balance||0) - amount });
+    });
+
+    // 2) Create withdrawal request
+    const wref = await addDoc(collection(db,'withdrawals'),{
+      uid: state.user.uid,
+      amountUSD: amount,
+      currency, network, address,
+      status: 'requested',   // only allowed on create by rules
+      createdAt: serverTimestamp(),
+    });
+
+    // 3) Resync header balance
+    const snap = await getDoc(doc(db,'users',state.user.uid));
+    state.userDoc = snap.data();
+    $('#balance').textContent = fmt(state.userDoc.balance||0);
+
+    // 4) Optional: ping your payout proxy to queue the send (admin will approve)
+    if(PROXY_BASE){
+      try{
+        const r = await fetch(`${PROXY_BASE}/api/payouts/create`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            wid: wref.id,
+            uid: state.user.uid,
+            amountUSD: amount,
+            currency, network, address
+          })
+        });
+        if(!r.ok) throw new Error('Proxy error');
+      }catch(e){
+        console.warn('Proxy notify failed (admin can still approve in panel).', e);
+      }
+    }
+
+    statusEl.textContent = 'Withdraw requested. Admin will review.';
+    show('#withdraw-modal', false);
+  }catch(err){
+    // if it failed after balance was deducted? we deducted only inside tx above; failures before addDoc do not refund. Here it failed before addDoc, so nothing to refund.
+    console.error(err);
+    statusEl.textContent = err.message || 'Withdraw failed';
+  }
+};

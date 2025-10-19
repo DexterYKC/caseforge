@@ -25,3 +25,44 @@ input{background:#0e1520;border:1px solid #223146;color:#e6edf3;border-radius:10
 #result{margin-top:8px;font-weight:700}
 /* Ensure hidden beats modal */
 .modal.hidden { display: none !important; }
+/* roulette */
+/* roulette */
+#wheel { overflow: hidden; position: relative; height: 140px; }
+#wheel .strip { display: flex; gap: 8px; will-change: transform; }
+#wheel .item { width: 120px; height: 120px; background:#0f1720; border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+#wheel .item img { width:80px; height:80px; object-fit:cover; border-radius:10px; }
+#wheel::after{
+  content:""; position:absolute; top:0; bottom:0; left:50%; width:2px;
+  transform:translateX(-1px);
+  background:linear-gradient(to bottom,#4ade80,#22d3ee);
+  opacity:.6;
+}
+
+/* +$ effect */
+.money-fx{
+  position: fixed; pointer-events:none; font-weight:700;
+  animation: money-up .9s ease-out forwards;
+  color:#22c55e; text-shadow:0 1px 0 #052e16;
+}
+@keyframes money-up{
+  0%{ transform:translateY(0); opacity:0 }
+  20%{ opacity:1 }
+  100%{ transform:translateY(-24px); opacity:0 }
+}
+
+.money-fx {
+  position: fixed;
+  transform: translate(-50%, 0);
+  font-weight: 700;
+  font-size: 14px;
+  color: #2ecc71;
+  pointer-events: none;
+  animation: moneyPop 0.9s ease-out forwards;
+  z-index: 9999;
+}
+@keyframes moneyPop {
+  0%   { opacity: 0; transform: translate(-50%, 8px) scale(0.9); }
+  20%  { opacity: 1; transform: translate(-50%, 0)   scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -22px) scale(0.95); }
+}
+

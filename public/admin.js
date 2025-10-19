@@ -34,6 +34,7 @@ onAuthStateChanged(auth, async (user)=>{
     return;
   }
   await loadCases();
+  await loadWithdrawals(); // NEW
 });
 
 // Load all cases
@@ -139,6 +140,108 @@ $('#item-add').onclick = async ()=>{
   await updateDoc(cref,{ items });
   await loadItems(currentCaseId);
 };
+
+// === Load withdrawals (requested/pending) ===
+async function loadWithdrawals(){
+  const cont = document.querySelector('#wd-admin');
+  if(!cont) return;
+  cont.innerHTML = '';
+
+  // simple fetch: get all withdrawals and filter in JS
+  const qs = await getDocs(collection(db,'withdrawals'));
+  qs.forEach(d=>{
+    const w = { id:d.id, ...d.data() };
+    // show newest requested first
+    if(w.status !== 'requested' && w.status !== 'approved' && w.status !== 'failed') return;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <h4>${w.currency} on ${w.network}</h4>
+      <div>Amount: $${Number(w.amountUSD||0).toFixed(2)}</div>
+      <div>To: <code>${w.address}</code></div>
+      <div>User: <code>${w.uid}</code></div>
+      <div>Status: <span class="badge">${w.status}</span></div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button class="approve">Approve & Send</button>
+        <button class="reject">Reject</button>
+      </div>`;
+    card.querySelector('.approve').onclick = ()=> approveWithdrawal(w);
+    card.querySelector('.reject').onclick  = ()=> rejectWithdrawal(w);
+    cont.appendChild(card);
+  });
+}
+
+// Call after admin auth ok
+onAuthStateChanged(auth, async (user)=>{
+  if(!user || !ADMIN_EMAILS.includes(user.email)){
+    document.body.innerHTML = '<div class="container"><h2>Forbidden</h2><p>Admin only.</p></div>';
+    return;
+  }
+  await loadCases();
+  await loadWithdrawals(); // NEW
+});
+
+// === Approve flow ===
+// Option A: ton proxy fait le réel envoi et renvoie txid.
+// Option B: tu cliques Approve -> proxy /api/payouts/send
+async function approveWithdrawal(w){
+  if(!confirm(`Approve and send $${w.amountUSD} ${w.currency} to ${w.address}?`)) return;
+
+  // 1) Call proxy to do payout (NOWPayments payout API, etc.)
+  let txid = '';
+  try{
+    if(PROXY_BASE){
+      const r = await fetch(`${PROXY_BASE}/api/payouts/send`,{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ wid: w.id })
+      });
+      const data = await r.json();
+      if(!r.ok) throw new Error(data?.error || 'Proxy send failed');
+      txid = data.txid || '';
+    } else {
+      // No proxy: just mark approved (DUMMY). Do NOT use in prod.
+      txid = 'manual-'+Date.now();
+    }
+  }catch(e){
+    alert('Proxy error: '+ (e.message||e));
+    return;
+  }
+
+  // 2) Mark as sent/approved with txid
+  await updateDoc(doc(db,'withdrawals', w.id), {
+    status: 'sent',
+    txid: txid,
+    processedAt: serverTimestamp()
+  });
+
+  alert('Withdrawal marked as sent.');
+  await loadWithdrawals();
+}
+
+// === Reject flow ===
+// Refund balance to user then mark rejected
+async function rejectWithdrawal(w){
+  if(!confirm('Reject this withdrawal and refund the balance?')) return;
+
+  // 1) refund user
+  await runTransaction(db, async (tx)=>{
+    const uref = doc(db,'users', w.uid);
+    const usnap= await tx.get(uref);
+    const u = usnap.data() || { balance:0 };
+    tx.update(uref, { balance: (u.balance||0) + Number(w.amountUSD||0) });
+  });
+
+  // 2) mark rejected
+  await updateDoc(doc(db,'withdrawals', w.id), {
+    status: 'rejected',
+    processedAt: serverTimestamp()
+  });
+
+  alert('Withdrawal rejected & refunded.');
+  await loadWithdrawals();
+}
+
 
 // Adjust user balance by email
 $('#user-adjust').onclick = async ()=>{
