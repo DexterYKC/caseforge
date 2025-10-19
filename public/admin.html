@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — CaseForge</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Admin</div>
+    <nav class="nav"><a href="index.html">← Back</a></nav>
+  </header>
+
+  <main class="container">
+    <section>
+      <h2>Cases</h2>
+      <div class="row">
+        <input id="case-name" placeholder="Name" />
+        <input id="case-price" placeholder="Price" type="number" />
+        <input id="case-image" placeholder="Image URL" />
+        <button id="case-add">Add / Update</button>
+      </div>
+      <div id="cases-admin" class="grid"></div>
+    </section>
+
+    <section>
+      <h2>Items for selected case</h2>
+      <div class="row">
+        <input id="item-name" placeholder="Item name" />
+        <input id="item-value" placeholder="Value" type="number" />
+        <input id="item-weight" placeholder="Weight" type="number" />
+        <input id="item-rarity" placeholder="Rarity" />
+        <input id="item-img" placeholder="Image URL" />
+        <button id="item-add">Add item</button>
+      </div>
+      <div id="items-admin" class="grid"></div>
+    </section>
+
+    <section>
+      <h2>Users</h2>
+      <div class="row">
+        <input id="user-email" placeholder="email" />
+        <input id="user-delta" placeholder="Δ balance (+/-)" type="number" />
+        <button id="user-adjust">Adjust</button>
+      </div>
+      <div id="users-admin" class="grid"></div>
+    </section>
+  </main>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
